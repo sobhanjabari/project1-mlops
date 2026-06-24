@@ -1,0 +1,146 @@
+{
+    "model_file": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\late_delivery_model.joblib",
+    "dataset": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\model_dataset_v2.csv",
+    "model_type": "HistGradientBoostingClassifier",
+    "threshold_selection": "max_f1_on_validation_set",
+    "threshold": 0.2275132275132275,
+    "threshold_report": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\threshold_report.csv",
+    "primary_metrics": [
+        "pr_auc",
+        "f1",
+        "precision",
+        "recall",
+        "roc_auc"
+    ],
+    "validation_threshold_metrics": {
+        "precision": 0.3473118279569892,
+        "recall": 0.412779552715655,
+        "f1": 0.3772262773717665,
+        "min_precision": 0.0,
+        "min_recall": 0.0,
+        "constraints_satisfied": true
+    },
+    "validation_metrics": {
+        "roc_auc": 0.8072920935076916,
+        "pr_auc": 0.3162517851663048,
+        "precision": 0.3473118279569892,
+        "recall": 0.412779552715655,
+        "f1": 0.3772262773722628,
+        "confusion_matrix": [
+            [
+                16516,
+                1214
+            ],
+            [
+                919,
+                646
+            ]
+        ]
+    },
+    "test_metrics": {
+        "roc_auc": 0.7973578521615993,
+        "pr_auc": 0.31171999501459485,
+        "precision": 0.3568953568953569,
+        "recall": 0.329073482428115,
+        "f1": 0.34242021276595747,
+        "confusion_matrix": [
+            [
+                16803,
+                928
+            ],
+            [
+                1050,
+                515
+            ]
+        ]
+    },
+    "target_distribution": {
+        "0": 88649,
+        "1": 7827
+    },
+    "feature_columns": [
+        "purchase_hour",
+        "purchase_dayofweek",
+        "purchase_month",
+        "is_weekend_purchase",
+        "estimated_delivery_days",
+        "has_approval_timestamp",
+        "approval_delay_hours",
+        "num_items",
+        "total_price",
+        "avg_price",
+        "max_price",
+        "total_freight",
+        "avg_freight",
+        "max_freight",
+        "num_sellers",
+        "num_products",
+        "num_product_categories",
+        "avg_product_weight_g",
+        "max_product_weight_g",
+        "avg_product_volume_cm3",
+        "max_product_volume_cm3",
+        "seller_zip_code_prefix",
+        "num_seller_states",
+        "freight_price_ratio",
+        "payment_value",
+        "payment_installments",
+        "num_payment_types",
+        "customer_zip_code_prefix",
+        "same_state_customer_seller",
+        "same_city_customer_seller",
+        "zip_prefix_diff",
+        "customer_seller_distance_km",
+        "main_seller_city",
+        "main_seller_state",
+        "main_product_category",
+        "main_payment_type",
+        "customer_city",
+        "customer_state"
+    ],
+    "numeric_features": [
+        "purchase_hour",
+        "purchase_dayofweek",
+        "purchase_month",
+        "is_weekend_purchase",
+        "estimated_delivery_days",
+        "has_approval_timestamp",
+        "approval_delay_hours",
+        "num_items",
+        "total_price",
+        "avg_price",
+        "max_price",
+        "total_freight",
+        "avg_freight",
+        "max_freight",
+        "num_sellers",
+        "num_products",
+        "num_product_categories",
+        "avg_product_weight_g",
+        "max_product_weight_g",
+        "avg_product_volume_cm3",
+        "max_product_volume_cm3",
+        "seller_zip_code_prefix",
+        "num_seller_states",
+        "freight_price_ratio",
+        "payment_value",
+        "payment_installments",
+        "num_payment_types",
+        "customer_zip_code_prefix",
+        "same_state_customer_seller",
+        "same_city_customer_seller",
+        "zip_prefix_diff",
+        "customer_seller_distance_km"
+    ],
+    "categorical_features": [
+        "main_seller_city",
+        "main_seller_state",
+        "main_product_category",
+        "main_payment_type",
+        "customer_city",
+        "customer_state"
+    ],
+    "random_state": 42,
+    "sklearn_version": "1.9.0",
+    "trained_at_utc": "2026-06-24T20:58:26.961911+00:00"
+}

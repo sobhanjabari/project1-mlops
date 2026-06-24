@@ -1,0 +1,38 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Project-generated artifacts
+.dataset-ready
+model_dataset.csv
+model_dataset_v2.csv
+final.csv
+predictions.csv
+threshold_report.csv
+threshold_tuning_from_predictions.csv
+late_delivery_model.joblib
