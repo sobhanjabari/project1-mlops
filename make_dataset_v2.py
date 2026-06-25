@@ -1,6 +1,4 @@
 from pathlib import Path
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
@@ -13,23 +11,7 @@ def read_csv(name: str) -> pd.DataFrame:
     """Read a project CSV using a script-relative path."""
     path = PROJECT_DIR / name
     if not path.exists():
-        if name == "olist_geolocation_dataset.csv":
-            return pd.DataFrame(
-                columns=[
-                    "geolocation_zip_code_prefix",
-                    "geolocation_lat",
-                    "geolocation_lng",
-                ]
-            )
         raise FileNotFoundError(f"Required input file not found: {path}")
-    return pd.read_csv(path)
-
-
-def read_optional_csv(name: str) -> Optional[pd.DataFrame]:
-    """Read a project CSV if it exists; otherwise return None."""
-    path = PROJECT_DIR / name
-    if not path.exists():
-        return None
     return pd.read_csv(path)
 
 
@@ -40,16 +22,6 @@ def mode_or_unknown(series: pd.Series) -> str:
     return str(series.mode().iloc[0])
 
 
-def haversine_km(lat1, lng1, lat2, lng2):
-    """Calculate great-circle distance between two latitude/longitude points."""
-    radius_km = 6371.0
-    lat1, lng1, lat2, lng2 = map(np.radians, [lat1, lng1, lat2, lng2])
-    dlat = lat2 - lat1
-    dlng = lng2 - lng1
-    a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlng / 2) ** 2
-    return 2 * radius_km * np.arcsin(np.sqrt(a))
-
-
 def build_dataset() -> pd.DataFrame:
     orders = read_csv("olist_orders_dataset.csv")
     items = read_csv("olist_order_items_dataset.csv")
@@ -58,7 +30,6 @@ def build_dataset() -> pd.DataFrame:
     products = read_csv("olist_products_dataset.csv")
     sellers = read_csv("olist_sellers_dataset.csv")
     translation = read_csv("product_category_name_translation.csv")
-    geolocation = read_optional_csv("olist_geolocation_dataset.csv")
 
     date_cols = [
         "order_purchase_timestamp",
@@ -144,53 +115,13 @@ def build_dataset() -> pd.DataFrame:
     df = df.merge(payments_agg, on="order_id", how="left")
     df = df.merge(customers, on="customer_id", how="left")
 
-    df["same_state_customer_seller"] = (
-        df["customer_state"] == df["main_seller_state"]
-    ).astype(int)
-    df["same_city_customer_seller"] = (
-        df["customer_city"] == df["main_seller_city"]
-    ).astype(int)
+    # Geolocation data is not available in this project, so we use robust
+    # location-proximity proxies based on customer and seller city/state.
+    df["same_state"] = (df["customer_state"] == df["main_seller_state"]).astype(int)
+    df["same_city"] = (df["customer_city"] == df["main_seller_city"]).astype(int)
     df["zip_prefix_diff"] = (
         df["customer_zip_code_prefix"] - df["seller_zip_code_prefix"]
     ).abs()
-
-    if geolocation is not None:
-        # Median coordinates per zip code prefix because geolocation often has
-        # multiple rows for the same prefix.
-        geo = (
-            geolocation.groupby("geolocation_zip_code_prefix")
-            .agg(lat=("geolocation_lat", "median"), lng=("geolocation_lng", "median"))
-            .reset_index()
-        )
-
-        df = df.merge(
-            geo.rename(
-                columns={
-                    "geolocation_zip_code_prefix": "customer_zip_code_prefix",
-                    "lat": "cust_lat",
-                    "lng": "cust_lng",
-                }
-            ),
-            on="customer_zip_code_prefix",
-            how="left",
-        )
-        df = df.merge(
-            geo.rename(
-                columns={
-                    "geolocation_zip_code_prefix": "seller_zip_code_prefix",
-                    "lat": "sell_lat",
-                    "lng": "sell_lng",
-                }
-            ),
-            on="seller_zip_code_prefix",
-            how="left",
-        )
-
-        df["customer_seller_distance_km"] = haversine_km(
-            df["cust_lat"], df["cust_lng"], df["sell_lat"], df["sell_lng"]
-        )
-    else:
-        df["customer_seller_distance_km"] = np.nan
 
     drop_cols = [
         "order_id",
@@ -201,10 +132,6 @@ def build_dataset() -> pd.DataFrame:
         "order_delivered_carrier_date",
         "order_delivered_customer_date",
         "order_estimated_delivery_date",
-        "cust_lat",
-        "cust_lng",
-        "sell_lat",
-        "sell_lng",
         # This changes during fulfilment and leaks post-purchase information.
         "order_status",
     ]

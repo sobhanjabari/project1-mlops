@@ -11,6 +11,7 @@ import sklearn
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
@@ -23,7 +24,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OrdinalEncoder
+from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder, StandardScaler
 
 
 RANDOM_STATE = 42
@@ -33,6 +34,7 @@ MODEL_PATH = PROJECT_DIR / "late_delivery_model.joblib"
 PREDICTIONS_PATH = PROJECT_DIR / "predictions.csv"
 METADATA_PATH = PROJECT_DIR / "model_metadata.json"
 THRESHOLD_REPORT_PATH = PROJECT_DIR / "threshold_report.csv"
+MODEL_COMPARISON_PATH = PROJECT_DIR / "model_comparison.csv"
 
 
 def get_feature_columns(df: pd.DataFrame, target_col: str) -> tuple[list[str], list[str]]:
@@ -65,33 +67,77 @@ def get_feature_columns(df: pd.DataFrame, target_col: str) -> tuple[list[str], l
     return numeric_features, categorical_features
 
 
-def make_pipeline(numeric_features: list[str], categorical_features: list[str]) -> Pipeline:
+def make_pipeline(
+    numeric_features: list[str],
+    categorical_features: list[str],
+    model_name: str = "hist_gradient_boosting",
+) -> Pipeline:
     """
-    Build a stronger model than plain logistic regression.
+    Build a model pipeline for late-delivery classification.
 
-    HistGradientBoosting handles non-linear relations between order value,
-    freight, seller/customer location and the estimated delivery window. For
-    this imbalanced problem, the threshold is tuned on the validation set rather
-    than relying on class_weight. In quick experiments, this produced better
-    ROC-AUC, PR-AUC and test F1 than class_weight="balanced".
+    Supported models:
+    - hist_gradient_boosting: stronger non-linear tree-based model used as the
+      primary production artifact.
+    - logistic_regression: linear baseline for transparent model comparison.
     """
-    numeric_transformer = Pipeline(
-        steps=[("imputer", SimpleImputer(strategy="median"))]
-    )
+    if model_name == "hist_gradient_boosting":
+        numeric_transformer = Pipeline(
+            steps=[("imputer", SimpleImputer(strategy="median"))]
+        )
 
-    categorical_transformer = Pipeline(
-        steps=[
-            ("imputer", SimpleImputer(strategy="most_frequent")),
-            (
-                "encoder",
-                OrdinalEncoder(
-                    handle_unknown="use_encoded_value",
-                    unknown_value=-1,
-                    encoded_missing_value=-1,
+        categorical_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                (
+                    "encoder",
+                    OrdinalEncoder(
+                        handle_unknown="use_encoded_value",
+                        unknown_value=-1,
+                        encoded_missing_value=-1,
+                    ),
                 ),
-            ),
-        ]
-    )
+            ]
+        )
+
+        model = HistGradientBoostingClassifier(
+            max_iter=300,
+            learning_rate=0.05,
+            l2_regularization=0.1,
+            class_weight=None,
+            random_state=RANDOM_STATE,
+        )
+
+    elif model_name == "logistic_regression":
+        numeric_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="median")),
+                ("scaler", StandardScaler()),
+            ]
+        )
+
+        categorical_transformer = Pipeline(
+            steps=[
+                ("imputer", SimpleImputer(strategy="most_frequent")),
+                (
+                    "encoder",
+                    OneHotEncoder(
+                        handle_unknown="ignore",
+                        min_frequency=20,
+                    ),
+                ),
+            ]
+        )
+
+        model = LogisticRegression(
+            max_iter=1000,
+            class_weight="balanced",
+            solver="saga",
+            n_jobs=-1,
+            random_state=RANDOM_STATE,
+        )
+
+    else:
+        raise ValueError(f"Unsupported model_name: {model_name}")
 
     preprocessor = ColumnTransformer(
         transformers=[
@@ -99,14 +145,6 @@ def make_pipeline(numeric_features: list[str], categorical_features: list[str]) 
             ("cat", categorical_transformer, categorical_features),
         ],
         remainder="drop",
-    )
-
-    model = HistGradientBoostingClassifier(
-        max_iter=300,
-        learning_rate=0.05,
-        l2_regularization=0.1,
-        class_weight=None,
-        random_state=RANDOM_STATE,
     )
 
     return Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
@@ -207,6 +245,70 @@ def evaluate_split(name: str, y_true: pd.Series, y_proba: np.ndarray, threshold:
     return metrics
 
 
+def flatten_metrics(model_name: str, threshold: float, val_metrics: dict, test_metrics: dict) -> dict:
+    """Return one CSV-friendly row with key validation and test metrics."""
+    row = {
+        "model_name": model_name,
+        "threshold": float(threshold),
+    }
+    for split_name, metrics in [("validation", val_metrics), ("test", test_metrics)]:
+        for metric_name in ["roc_auc", "pr_auc", "precision", "recall", "f1"]:
+            row[f"{split_name}_{metric_name}"] = metrics[metric_name]
+    return row
+
+
+def evaluate_candidate_model(
+    model_name: str,
+    numeric_features: list[str],
+    categorical_features: list[str],
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    X_train_full: pd.DataFrame,
+    y_train_full: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    min_precision: float,
+    min_recall: float,
+) -> dict:
+    """Train, tune threshold, refit, and evaluate one candidate model."""
+    print(f"\nTraining candidate model: {model_name}")
+    clf = make_pipeline(numeric_features, categorical_features, model_name=model_name)
+    clf.fit(X_train, y_train)
+
+    val_proba = clf.predict_proba(X_val)[:, 1]
+    threshold, threshold_metrics, threshold_report = find_best_threshold(
+        y_val,
+        val_proba,
+        min_precision=min_precision,
+        min_recall=min_recall,
+    )
+
+    print(f"\n{model_name} selected threshold from validation set: {threshold:.4f}")
+    print(f"{model_name} validation metrics at selected threshold:", threshold_metrics)
+
+    val_metrics = evaluate_split(f"{model_name} Validation", y_val, val_proba, threshold)
+
+    final_clf = make_pipeline(numeric_features, categorical_features, model_name=model_name)
+    final_clf.fit(X_train_full, y_train_full)
+
+    final_test_proba = final_clf.predict_proba(X_test)[:, 1]
+    test_metrics = evaluate_split(f"{model_name} Test", y_test, final_test_proba, threshold)
+
+    return {
+        "model_name": model_name,
+        "model": final_clf,
+        "threshold": threshold,
+        "threshold_metrics": threshold_metrics,
+        "threshold_report": threshold_report,
+        "validation_metrics": val_metrics,
+        "test_metrics": test_metrics,
+        "validation_probabilities": val_proba,
+        "test_probabilities": final_test_proba,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the Olist late-delivery model.")
     parser.add_argument(
@@ -282,33 +384,57 @@ def main() -> None:
     print("Validation shape:", X_val.shape)
     print("Test shape:", X_test.shape)
 
-    clf = make_pipeline(numeric_features, categorical_features)
+    candidate_model_names = ["hist_gradient_boosting", "logistic_regression"]
+    comparison_results = []
 
-    print("\nTraining model...")
-    clf.fit(X_train, y_train)
+    for model_name in candidate_model_names:
+        comparison_results.append(
+            evaluate_candidate_model(
+                model_name=model_name,
+                numeric_features=numeric_features,
+                categorical_features=categorical_features,
+                X_train=X_train,
+                y_train=y_train,
+                X_val=X_val,
+                y_val=y_val,
+                X_train_full=X_train_full,
+                y_train_full=y_train_full,
+                X_test=X_test,
+                y_test=y_test,
+                min_precision=args.min_precision,
+                min_recall=args.min_recall,
+            )
+        )
 
-    val_proba = clf.predict_proba(X_val)[:, 1]
-    threshold, threshold_metrics, threshold_report = find_best_threshold(
-        y_val,
-        val_proba,
-        min_precision=args.min_precision,
-        min_recall=args.min_recall,
-    )
+    primary_result = comparison_results[0]
+    threshold = primary_result["threshold"]
+    threshold_metrics = primary_result["threshold_metrics"]
+    threshold_report = primary_result["threshold_report"]
     threshold_report.to_csv(THRESHOLD_REPORT_PATH, index=False)
-    print(f"\nSelected threshold from validation set: {threshold:.4f}")
-    print("Validation metrics at selected threshold:", threshold_metrics)
-    print(f"Threshold report saved as: {THRESHOLD_REPORT_PATH}")
 
-    val_metrics = evaluate_split("Validation", y_val, val_proba, threshold)
+    comparison_rows = [
+        flatten_metrics(
+            result["model_name"],
+            result["threshold"],
+            result["validation_metrics"],
+            result["test_metrics"],
+        )
+        for result in comparison_results
+    ]
+    comparison_df = pd.DataFrame(comparison_rows).sort_values(
+        by="test_pr_auc", ascending=False
+    )
+    comparison_df.to_csv(MODEL_COMPARISON_PATH, index=False)
+    print(f"\nThreshold report saved as: {THRESHOLD_REPORT_PATH}")
+    print(f"Model comparison saved as: {MODEL_COMPARISON_PATH}")
+    print("\nModel comparison:")
+    print(comparison_df.to_string(index=False))
 
-    # Refit on train + validation after threshold selection to use more data
-    # for the final model artifact. The test set is still untouched here: it is
-    # evaluated only after the threshold is fixed and using this same final_clf.
-    final_clf = make_pipeline(numeric_features, categorical_features)
-    final_clf.fit(X_train_full, y_train_full)
-
-    final_test_proba = final_clf.predict_proba(X_test)[:, 1]
-    test_metrics = evaluate_split("Test", y_test, final_test_proba, threshold)
+    # Keep the original gradient boosting model as the final production artifact.
+    final_clf = primary_result["model"]
+    final_test_proba = primary_result["test_probabilities"]
+    val_metrics = primary_result["validation_metrics"]
+    test_metrics = primary_result["test_metrics"]
 
     joblib.dump(final_clf, MODEL_PATH)
     print(f"\nModel saved as: {MODEL_PATH}")
@@ -324,13 +450,24 @@ def main() -> None:
         "model_file": str(MODEL_PATH),
         "dataset": str(dataset_path),
         "model_type": "HistGradientBoostingClassifier",
+        "comparison_model_types": ["HistGradientBoostingClassifier", "LogisticRegression"],
         "threshold_selection": "max_f1_on_validation_set",
         "threshold": threshold,
         "threshold_report": str(THRESHOLD_REPORT_PATH),
+        "model_comparison": str(MODEL_COMPARISON_PATH),
         "primary_metrics": ["pr_auc", "f1", "precision", "recall", "roc_auc"],
         "validation_threshold_metrics": threshold_metrics,
         "validation_metrics": val_metrics,
         "test_metrics": test_metrics,
+        "comparison_results": {
+            result["model_name"]: {
+                "threshold": result["threshold"],
+                "validation_threshold_metrics": result["threshold_metrics"],
+                "validation_metrics": result["validation_metrics"],
+                "test_metrics": result["test_metrics"],
+            }
+            for result in comparison_results
+        },
         "target_distribution": y.value_counts().to_dict(),
         "feature_columns": feature_cols,
         "numeric_features": numeric_features,

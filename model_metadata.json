@@ -2,9 +2,14 @@
     "model_file": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\late_delivery_model.joblib",
     "dataset": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\model_dataset_v2.csv",
     "model_type": "HistGradientBoostingClassifier",
+    "comparison_model_types": [
+        "HistGradientBoostingClassifier",
+        "LogisticRegression"
+    ],
     "threshold_selection": "max_f1_on_validation_set",
-    "threshold": 0.2275132275132275,
+    "threshold": 0.18718639291359446,
     "threshold_report": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\threshold_report.csv",
+    "model_comparison": "C:\\Users\\sobhan\\Downloads\\project1-mlops\\model_comparison.csv",
     "primary_metrics": [
         "pr_auc",
         "f1",
@@ -21,8 +26,8 @@
         "constraints_satisfied": true
     },
     "validation_metrics": {
-        "roc_auc": 0.8072920935076916,
-        "pr_auc": 0.3162517851663048,
+        "roc_auc": 0.8047615366457097,
+        "pr_auc": 0.3211215267636448,
         "precision": 0.3473118279569892,
         "recall": 0.412779552715655,
         "f1": 0.3772262773722628,
@@ -38,21 +43,113 @@
         ]
     },
     "test_metrics": {
-        "roc_auc": 0.7973578521615993,
-        "pr_auc": 0.31171999501459485,
-        "precision": 0.3568953568953569,
-        "recall": 0.329073482428115,
-        "f1": 0.34242021276595747,
+        "roc_auc": 0.796774696327059,
+        "pr_auc": 0.3111449913847509,
+        "precision": 0.32765737874097006,
+        "recall": 0.4057507987220447,
+        "f1": 0.3625463888095918,
         "confusion_matrix": [
             [
-                16803,
-                928
+                16428,
+                1303
             ],
             [
-                1050,
-                515
+                930,
+                635
             ]
         ]
+    },
+    "comparison_results": {
+        "hist_gradient_boosting": {
+            "threshold": 0.18718639291359446,
+            "validation_threshold_metrics": {
+                "precision": 0.3473118279569892,
+                "recall": 0.412779552715655,
+                "f1": 0.3772262773717665,
+                "min_precision": 0.0,
+                "min_recall": 0.0,
+                "constraints_satisfied": true
+            },
+            "validation_metrics": {
+                "roc_auc": 0.8047615366457097,
+                "pr_auc": 0.3211215267636448,
+                "precision": 0.3473118279569892,
+                "recall": 0.412779552715655,
+                "f1": 0.3772262773722628,
+                "confusion_matrix": [
+                    [
+                        16516,
+                        1214
+                    ],
+                    [
+                        919,
+                        646
+                    ]
+                ]
+            },
+            "test_metrics": {
+                "roc_auc": 0.796774696327059,
+                "pr_auc": 0.3111449913847509,
+                "precision": 0.32765737874097006,
+                "recall": 0.4057507987220447,
+                "f1": 0.3625463888095918,
+                "confusion_matrix": [
+                    [
+                        16428,
+                        1303
+                    ],
+                    [
+                        930,
+                        635
+                    ]
+                ]
+            }
+        },
+        "logistic_regression": {
+            "threshold": 0.6365462444713127,
+            "validation_threshold_metrics": {
+                "precision": 0.19883399815894445,
+                "recall": 0.41405750798722046,
+                "f1": 0.26865671641747213,
+                "min_precision": 0.0,
+                "min_recall": 0.0,
+                "constraints_satisfied": true
+            },
+            "validation_metrics": {
+                "roc_auc": 0.7209316531789407,
+                "pr_auc": 0.1961431994511811,
+                "precision": 0.19883399815894445,
+                "recall": 0.41405750798722046,
+                "f1": 0.26865671641791045,
+                "confusion_matrix": [
+                    [
+                        15119,
+                        2611
+                    ],
+                    [
+                        917,
+                        648
+                    ]
+                ]
+            },
+            "test_metrics": {
+                "roc_auc": 0.7101228638205717,
+                "pr_auc": 0.1859665579909478,
+                "precision": 0.19586983729662077,
+                "recall": 0.4,
+                "f1": 0.26296996429321573,
+                "confusion_matrix": [
+                    [
+                        15161,
+                        2570
+                    ],
+                    [
+                        939,
+                        626
+                    ]
+                ]
+            }
+        }
     },
     "target_distribution": {
         "0": 88649,
@@ -87,10 +184,9 @@
         "payment_installments",
         "num_payment_types",
         "customer_zip_code_prefix",
-        "same_state_customer_seller",
-        "same_city_customer_seller",
+        "same_state",
+        "same_city",
         "zip_prefix_diff",
-        "customer_seller_distance_km",
         "main_seller_city",
         "main_seller_state",
         "main_product_category",
@@ -127,10 +223,9 @@
         "payment_installments",
         "num_payment_types",
         "customer_zip_code_prefix",
-        "same_state_customer_seller",
-        "same_city_customer_seller",
-        "zip_prefix_diff",
-        "customer_seller_distance_km"
+        "same_state",
+        "same_city",
+        "zip_prefix_diff"
     ],
     "categorical_features": [
         "main_seller_city",
@@ -142,5 +237,5 @@
     ],
     "random_state": 42,
     "sklearn_version": "1.9.0",
-    "trained_at_utc": "2026-06-24T20:58:26.961911+00:00"
+    "trained_at_utc": "2026-06-25T16:05:08.524020+00:00"
 }
