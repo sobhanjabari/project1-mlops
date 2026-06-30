@@ -3,3 +3,5 @@ numpy>=1.24
 scikit-learn>=1.3
 joblib>=1.3
 jupyter>=1.0
+fastapi>=0.110,<0.116
+uvicorn>=0.27,<0.35

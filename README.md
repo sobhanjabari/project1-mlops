@@ -11,6 +11,7 @@ Late deliveries can reduce customer satisfaction and increase operational costs.
 - `make_dataset_v2.py` — builds the modelling dataset from the raw Olist CSV files.
 - `train_model.py` — trains and evaluates a `HistGradientBoostingClassifier` pipeline.
 - `tune_threshold.py` — evaluates precision/recall/F1 across thresholds from `predictions.csv`.
+- `main.py` — FastAPI application exposing health, model-info, prediction, and metrics endpoints.
 - `olist_late_delivery_analysis.ipynb` — exploratory notebook.
 - `model_metadata.json` — saved model metrics and training metadata.
 - `late_delivery_model.joblib` — trained scikit-learn pipeline artifact.
@@ -22,6 +23,10 @@ Late deliveries can reduce customer satisfaction and increase operational costs.
 ├── make_dataset_v2.py                 # Feature engineering / modelling dataset builder
 ├── train_model.py                     # Model training, validation threshold selection, evaluation
 ├── tune_threshold.py                  # Threshold analysis from saved predictions
+├── main.py                            # FastAPI app entrypoint
+├── api/                               # API routes and metrics summary helpers
+├── dependencies.py                    # Shared model/metadata loading helpers
+├── models.py                          # Pydantic request/response schemas
 ├── check_data.py                      # Quick dataset sanity checks
 ├── olist_late_delivery_analysis.ipynb # Exploratory analysis notebook
 ├── model_metadata.json                # Latest saved metrics/metadata
@@ -77,6 +82,76 @@ Inspect threshold trade-offs from saved test predictions:
 ```bash
 python tune_threshold.py --start 0.05 --stop 0.95 --step 0.01
 ```
+
+## FastAPI service
+
+Start the API locally:
+
+```bash
+uvicorn main:app --reload
+```
+
+Required endpoints:
+
+- `GET /health` — service and artifact health check.
+- `GET /model-info` — model type/version, threshold, and required feature columns.
+- `POST /predict` — single-order late-delivery prediction.
+- `GET /metrics` — validation/test metrics plus a summary of `predictions.csv` when available.
+
+Additional endpoint:
+
+- `POST /predict/batch` — batch prediction with aggregate risk summary.
+
+Example single prediction request:
+
+```bash
+curl -X POST http://127.0.0.1:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "order_id": "sample-order-001",
+    "features": {
+      "purchase_hour": 13,
+      "purchase_dayofweek": 4,
+      "purchase_month": 6,
+      "is_weekend_purchase": 0,
+      "estimated_delivery_days": 23.45,
+      "has_approval_timestamp": 1,
+      "approval_delay_hours": 0.19,
+      "num_items": 1,
+      "total_price": 99.99,
+      "avg_price": 99.99,
+      "max_price": 99.99,
+      "total_freight": 17.95,
+      "avg_freight": 17.95,
+      "max_freight": 17.95,
+      "num_sellers": 1,
+      "num_products": 1,
+      "num_product_categories": 1,
+      "avg_product_weight_g": 1200,
+      "max_product_weight_g": 1200,
+      "avg_product_volume_cm3": 15750,
+      "max_product_volume_cm3": 15750,
+      "seller_zip_code_prefix": 3426,
+      "num_seller_states": 1,
+      "freight_price_ratio": 0.1795,
+      "payment_value": 117.94,
+      "payment_installments": 6,
+      "num_payment_types": 2,
+      "customer_zip_code_prefix": 23932,
+      "same_state": 0,
+      "same_city": 0,
+      "zip_prefix_diff": 20506,
+      "main_seller_city": "sao paulo",
+      "main_seller_state": "SP",
+      "main_product_category": "cool_stuff",
+      "main_payment_type": "credit_card",
+      "customer_city": "angra dos reis",
+      "customer_state": "RJ"
+    }
+  }'
+```
+
+Prediction responses include `order_id`, `late_probability`, `risk_level`, `predicted_is_late`, `model_name`, model version, a short explanation, and a recommended action.
 
 ## Outputs
 
